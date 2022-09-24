@@ -1,5 +1,7 @@
 import numpy as np
 
+from cs285.infrastructure.utils import normalize
+
 from .base_agent import BaseAgent
 from cs285.policies.MLP_policy import MLPPolicyPG
 from cs285.infrastructure.replay_buffer import ReplayBuffer
@@ -97,7 +99,8 @@ class PGAgent(BaseAgent):
             ## TODO: values were trained with standardized q_values, so ensure
                 ## that the predictions have the same mean and standard deviation as
                 ## the current batch of q_values
-            values = np.std(q_values) * values_unnormalized + np.mean(q_values) # (values-mean)/sigma follows the same normal distribution with q_values
+            values_normalized = normalize(values_unnormalized, np.mean(values_unnormalized),np.std(values_unnormalized))
+            values = np.std(q_values) * values_normalized + np.mean(q_values) # (values-mean)/sigma follows the same normal distribution with q_values
 
             if self.gae_lambda is not None:
                 ## append a dummy T+1 value for simpler recursive calculation

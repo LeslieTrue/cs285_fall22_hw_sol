@@ -93,7 +93,9 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             observation = obs[None]
 
         # TODO return the action that the policy prescribes
-        action = self.forward(ptu.from_numpy(observation))
+        obs = ptu.from_numpy(obs)
+        with torch.no_grad():
+            action = self(obs).sample()
         return ptu.to_numpy(action)
         raise NotImplementedError
 
@@ -156,8 +158,9 @@ class MLPPolicyPG(MLPPolicy):
 
             ## Note: You will need to convert the targets into a tensor using
                 ## ptu.from_numpy before using it in the loss
+            self.baseline_optimizer.zero_grad()
             normalized_q = ptu.from_numpy((q_values - np.mean(q_values))/np.std(q_values))
-            baseline_loss = self.baseline_loss(self.baseline(observations),normalized_q)
+            baseline_loss = self.baseline_loss(self.baseline(observations).squeeze(),normalized_q)
             baseline_loss.backward()
             self.baseline_optimizer.step()
 
