@@ -78,8 +78,8 @@ class FFModel(nn.Module, BaseModel):
                 unnormalized) output of the delta network. This is needed
         """
         # normalize input data to mean 0, std 1
-        obs_normalized = ptu.from_numpy((obs_unnormalized - obs_mean)/obs_std)# TODO(Q1)
-        acs_normalized = ptu.from_numpy((acs_unnormalized - acs_mean)/acs_std) # TODO(Q1)
+        obs_normalized = ptu.from_numpy(normalize(obs_unnormalized, obs_mean, obs_std))# TODO(Q1)
+        acs_normalized = ptu.from_numpy(normalize(acs_unnormalized, acs_mean, acs_std)) # TODO(Q1)
 
         # predicted change in obs
         concatenated_input = torch.cat([obs_normalized, acs_normalized], dim=1)
@@ -89,7 +89,7 @@ class FFModel(nn.Module, BaseModel):
         # *normalized change* in state, i.e. normalized(s_t+1 - s_t).
         delta_pred_normalized = self.delta_network(concatenated_input)
         # TODO(Q1)
-        next_obs_pred = obs_unnormalized + ptu.to_numpy(delta_pred_normalized) * delta_std + delta_mean # TODO(Q1)
+        next_obs_pred = obs_unnormalized + unnormalize(ptu.to_numpy(delta_pred_normalized), delta_mean, delta_std) # TODO(Q1)
         return next_obs_pred, delta_pred_normalized
 
     def get_prediction(self, obs, acs, data_statistics):
@@ -106,7 +106,7 @@ class FFModel(nn.Module, BaseModel):
              - 'delta_std'
         :return: a numpy array of the predicted next-states (s_t+1)
         """
-        prediction = self(obs, acs, **data_statistics)[0]
+        prediction, prediction_normalized = self(obs, acs, **data_statistics)
         # TODO(Q1) get the predicted next-states (s_t+1) as a numpy array
         # Hint: `self(...)` returns a tuple, but you only need to use one of the
         # outputs.
@@ -127,12 +127,12 @@ class FFModel(nn.Module, BaseModel):
              - 'delta_std'
         :return:
         """
-        target = (next_observations - observations)*data_statistics['delta_std'] + data_statistics['delta_mean']
+        target = unnormalize(next_observations - observations, data_statistics['delta_mean'], data_statistics['delta_std'])
         # TODO(Q1) compute the normalized target for the model.
         # Hint: you should use `data_statistics['delta_mean']` and
         # `data_statistics['delta_std']`, which keep track of the mean
         # and standard deviation of the model.
-        prediction_normalized = self(observations, actions, **data_statistics)[1]
+        pred, prediction_normalized = self(observations, actions, **data_statistics)
         # print(prediction_normalized)
 
         loss = self.loss(prediction_normalized, ptu.from_numpy(target))
