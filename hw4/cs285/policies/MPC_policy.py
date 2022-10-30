@@ -2,7 +2,6 @@ import numpy as np
 
 from .base_policy import BasePolicy
 
-
 class MPCPolicy(BasePolicy):
 
     def __init__(self,
@@ -53,6 +52,7 @@ class MPCPolicy(BasePolicy):
             # TODO(Q1) uniformly sample trajectories and return an array of
             # dimensions (num_sequences, horizon, self.ac_dim) in the range
             # [self.low, self.high]
+            random_action_sequences = np.random.uniform(self.low, self.high, (num_sequences, horizon, self.ac_dim))
             return random_action_sequences
         elif self.sample_strategy == 'cem':
             # TODO(Q5): Implement action selection using CEM.
@@ -83,10 +83,13 @@ class MPCPolicy(BasePolicy):
         #
         # Then, return the mean predictions across all ensembles.
         # Hint: the return value should be an array of shape (N,)
+        rewards = []
         for model in self.dyn_models: 
-            pass
+            temp_rew = self.calculate_sum_of_rewards(obs, candidate_action_sequences, model)
+            rewards.append(temp_rew)
+        rewards = np.mean(rewards, axis = 0)
 
-        return TODO
+        return rewards
 
     def get_action(self, obs):
         if self.data_statistics is None:
@@ -103,8 +106,9 @@ class MPCPolicy(BasePolicy):
             predicted_rewards = self.evaluate_candidate_sequences(candidate_action_sequences, obs)
 
             # pick the action sequence and return the 1st element of that sequence
-            best_action_sequence = None  # TODO (Q2)
-            action_to_take = None  # TODO (Q2)
+            # print(len(predicted_rewards))
+            best_action_sequence = candidate_action_sequences[np.argmax(predicted_rewards)] # TODO (Q2)
+            action_to_take = best_action_sequence[0]  # TODO (Q2)
             return action_to_take[None]  # Unsqueeze the first index
 
     def calculate_sum_of_rewards(self, obs, candidate_action_sequences, model):
@@ -120,7 +124,15 @@ class MPCPolicy(BasePolicy):
         :return: numpy array with the sum of rewards for each action sequence.
         The array should have shape [N].
         """
-        sum_of_rewards = None  # TODO (Q2)
+        N = candidate_action_sequences.shape[0]
+        sum_of_rewards = np.zeros(N)
+        obs = np.tile(obs, (N, 1))
+        for i in range(self.horizon):
+            actions = candidate_action_sequences[:, i, :]
+            rew, dones = self.env.get_reward(obs, actions)
+            sum_of_rewards += rew
+            obs = model.get_prediction(obs, actions, self.data_statistics)
+        # TODO (Q2)
         # For each candidate action sequence, predict a sequence of
         # states for each dynamics model in your ensemble.
         # Once you have a sequence of predicted states from each model in
