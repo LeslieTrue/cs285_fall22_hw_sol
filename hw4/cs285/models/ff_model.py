@@ -127,7 +127,7 @@ class FFModel(nn.Module, BaseModel):
              - 'delta_std'
         :return:
         """
-        target = unnormalize(next_observations - observations, data_statistics['delta_mean'], data_statistics['delta_std'])
+        target = normalize(next_observations - observations, data_statistics['delta_mean'], data_statistics['delta_std'])
         # TODO(Q1) compute the normalized target for the model.
         # Hint: you should use `data_statistics['delta_mean']` and
         # `data_statistics['delta_std']`, which keep track of the mean
