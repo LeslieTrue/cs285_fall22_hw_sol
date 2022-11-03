@@ -1,3 +1,4 @@
+from html import entities
 import numpy as np
 
 from .base_policy import BasePolicy
@@ -60,6 +61,22 @@ class MPCPolicy(BasePolicy):
             # iteratively as described in Section 3.3, "Iterative Random-Shooting with Refinement" of
             # https://arxiv.org/pdf/1909.11652.pdf 
             for i in range(self.cem_iterations):
+                if i == 0:
+                    action_sequences = np.random.uniform(self.low, self.high, (num_sequences, horizon, self.ac_dim))
+                else:
+                    action_sequences = np.random.normal(elite_mean, elite_std, (num_sequences, horizon, self.ac_dim))
+                
+                pred_rew = self.evaluate_candidate_sequences(action_sequences, obs)
+                idx = np.argsort(pred_rew)[-self.cem_num_elites:]
+                elite = action_sequences[idx]
+                elite_mean, elite_std = np.mean(elite, axis = 0), np.std(elite, axis = 0)
+                if i == 0:
+                    mean = elite_mean
+                    std = elite_std
+                else:
+                    mean = self.cem_alpha * elite_mean + (1 - self.cem_alpha) * mean
+                    std = self.cem_alpha * elite_std + (1 - self.cem_alpha) * std
+
                 # - Sample candidate sequences from a Gaussian with the current 
                 #   elite mean and variance
                 #     (Hint: remember that for the first iteration, we instead sample
@@ -71,8 +88,7 @@ class MPCPolicy(BasePolicy):
                 pass
 
             # TODO(Q5): Set `cem_action` to the appropriate action chosen by CEM
-            cem_action = None
-
+            cem_action = mean
             return cem_action[None]
         else:
             raise Exception(f"Invalid sample_strategy: {self.sample_strategy}")
@@ -88,7 +104,6 @@ class MPCPolicy(BasePolicy):
             temp_rew = self.calculate_sum_of_rewards(obs, candidate_action_sequences, model)
             rewards.append(temp_rew)
         rewards = np.mean(rewards, axis = 0)
-
         return rewards
 
     def get_action(self, obs):
@@ -101,15 +116,17 @@ class MPCPolicy(BasePolicy):
 
         if candidate_action_sequences.shape[0] == 1:
             # CEM: only a single action sequence to consider; return the first action
-            return candidate_action_sequences[0][0][None]
+            best_idx = 0
         else:
             predicted_rewards = self.evaluate_candidate_sequences(candidate_action_sequences, obs)
-
             # pick the action sequence and return the 1st element of that sequence
             # print(len(predicted_rewards))
-            best_action_sequence = candidate_action_sequences[np.argmax(predicted_rewards)] # TODO (Q2)
-            action_to_take = best_action_sequence[0]  # TODO (Q2)
-            return action_to_take[None]  # Unsqueeze the first index
+            best_idx = np.argmax(predicted_rewards)
+             # TODO (Q2)
+             # TODO (Q2)
+        action_to_take = candidate_action_sequences[best_idx][0]
+        # assert action_to_take.shape == (1, self.ac_dim)
+        return action_to_take[None]  # Unsqueeze the first index
 
     def calculate_sum_of_rewards(self, obs, candidate_action_sequences, model):
         """
