@@ -59,8 +59,8 @@ def main():
     parser.add_argument('--offline_exploitation', action='store_true')
     parser.add_argument('--cql_alpha', type=float, default=0.0)
 
-    parser.add_argument('--exploit_rew_shift', type=float, default=0.0)
-    parser.add_argument('--exploit_rew_scale', type=float, default=1.0)
+    parser.add_argument('--exploit_rew_shift', type=float, default=1.0)
+    parser.add_argument('--exploit_rew_scale', type=float, default=100.0)
 
     parser.add_argument('--rnd_output_size', type=int, default=5)
     parser.add_argument('--rnd_n_layers', type=int, default=2)

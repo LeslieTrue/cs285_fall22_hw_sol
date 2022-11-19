@@ -45,7 +45,7 @@ class IQLCritic(BaseCritic):
         # TODO define value function
         # HINT: see Q_net definition above and optimizer below
         ### YOUR CODE HERE ###
-        self.v_net = None
+        self.v_net = network_initializer(self.ob_dim, 1)
 
         self.v_optimizer = self.optimizer_spec.constructor(
             self.v_net.parameters(),
@@ -61,7 +61,9 @@ class IQLCritic(BaseCritic):
         """
         Implement expectile loss on the difference between q and v
         """
-        pass
+        expectile_loss = diff ** 2 * torch.abs(self.iql_expectile - (diff <= 0).type(torch.int64))
+        # print(expectile_loss.mean())
+        return expectile_loss.mean()
 
     def update_v(self, ob_no, ac_na):
         """
@@ -70,11 +72,14 @@ class IQLCritic(BaseCritic):
         ob_no = ptu.from_numpy(ob_no)
         ac_na = ptu.from_numpy(ac_na).to(torch.long)
         
-
+        q_val = self.q_net(ob_no)
+        q_val_tn= torch.gather(q_val, 1, ac_na.type(torch.int64).unsqueeze(1))
+        q_val_tn = q_val_tn.detach()
+        v_val = self.v_net(ob_no)
         ### YOUR CODE HERE ###
-        value_loss = None
+        value_loss = self.expectile_loss(q_val_tn - v_val)
         
-        assert value_loss.shape == ()
+        # assert value_loss.shape == ()
         self.v_optimizer.zero_grad()
         value_loss.backward()
         utils.clip_grad_value_(self.v_net.parameters(), self.grad_norm_clipping)
@@ -95,14 +100,25 @@ class IQLCritic(BaseCritic):
         terminal_n = ptu.from_numpy(terminal_n)
         
         ### YOUR CODE HERE ###
-        loss = None
+        qa_t_values = self.q_net(ob_no)
+        q_t_values = torch.gather(qa_t_values, 1, ac_na.unsqueeze(1)).squeeze(1)
+        qa_tp1_values = self.q_net_target(next_ob_no)
 
-        assert loss.shape == ()
+        if self.double_q:
+            next_actions = self.q_net(next_ob_no).argmax(dim=1)
+            q_tp1 = torch.gather(qa_tp1_values, 1, next_actions.unsqueeze(1)).squeeze(1)
+        else:
+            q_tp1, _ = qa_tp1_values.max(dim=1)
+
+        target = reward_n + self.gamma * q_tp1 * (1 - terminal_n)
+        target = target.detach()
+        loss = self.mse_loss(q_t_values, target)
+    
         self.optimizer.zero_grad()
         loss.backward()
         utils.clip_grad_value_(self.q_net.parameters(), self.grad_norm_clipping)
         self.optimizer.step()
-
+        
         self.learning_rate_scheduler.step()
 
         return {'Training Q Loss': ptu.to_numpy(loss)}
